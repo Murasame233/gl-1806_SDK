@@ -6,6 +6,7 @@
 #
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
+include ./nand.mk
 
 define get_kernel_entry
 0x$(shell $(TARGET_CROSS)nm $(1) 2>/dev/null | grep " kernel_entry" | cut -f1 -d ' ')
@@ -58,20 +59,25 @@ define Image/MakeSysupgradeBinary
 	cat $(KDIR)/uImage.lzma $(KDIR)/root.squashfs > $(KDIR)/$(output_name)
 	$(call prepare_generic_squashfs,$(KDIR)/$(output_name))
 	$(CP) $(KDIR)/$(output_name) $(BIN_DIR)/$(output_name)
+	$(call Build/append-metadata,$(BIN_DIR)/$(output_name))
 endef
 
 define Image/Build/Initramfs
 	$(call CompressLzma,$(KDIR)/vmlinux-initramfs,$(KDIR)/vmlinux-initramfs.bin.lzma)
 	$(call MkuImage,lzma,,$(KDIR)/vmlinux-initramfs.bin.lzma,$(KDIR)/uImage-initramfs.lzma)
 	cp $(KDIR)/vmlinux-initramfs.elf $(BIN_DIR)/$(IMG_PREFIX)-vmlinux-initramfs.elf
-	cp $(KDIR)/vmlinux-initramfs $(BIN_DIR)/$(IMG_PREFIX)-vmlinux-initramfs.bin
-	cp $(KDIR)/uImage-initramfs.lzma $(BIN_DIR)/uImage-initramfs.lzma
 endef
 
 define Image/Build
 	$(call Image/Build/$(1))
 	dd if=$(KDIR)/root.$(1) of=$(BIN_DIR)/$(IMG_PREFIX)-root.$(1) bs=128k conv=sync
-	$(call Image/MakeSysupgradeBinary)
+	$(if $(TARGET_DEVICES),,$(call Image/MakeSysupgradeBinary))
+	rm -rf $(BIN_DIR)/$(IMG_PREFIX)-root.squashfs
+	rm -rf $(BIN_DIR)/$(IMG_PREFIX)-uImage-lzma
+	rm -rf $(BIN_DIR)/$(IMG_PREFIX)-uImage-gzip
+	rm -rf $(BIN_DIR)/$(IMG_PREFIX)-vmlinux.elf
+	rm -rf $(BIN_DIR)/$(IMG_PREFIX)-vmlinux-initramfs.elf
+	rm -rf $(BIN_DIR)/uImage-initramfs.lzma
 endef
 
 $(eval $(call BuildImage))
